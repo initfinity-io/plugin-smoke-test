@@ -23,11 +23,22 @@ Load and activate this plugin to confirm that every surface of the plugin system
 | `events.emit / events.on` | Ping → pong round-trip via the event bus |
 | `settings.get` | Reads and logs current settings keys |
 | `settings.subscribe` | Receives future settings change callbacks |
-| `ui.addToolbarItem` | Injects a hidden `<span>` stub |
-| `ui.addStatusBarItem` | Injects a hidden `<span>` stub |
-| `ui.addNavbarItem` | Injects a hidden `<span>` stub |
-| `ui.addInspectorTab` | Adds a "Smoke Test" inspector panel |
-| `ui.addContextMenuItem` | Adds context items on both `canvas` and `node` targets |
+| **`ui.addStatusBarItem`** | **"Smoke Test" button in bottom status bar** |
+| **`ui.addNavbarItem`** | **🦎 icon in left sidebar** |
+| **`ui.addInspectorTab`** | **"Smoke Test" tab in right inspector panel** |
+| **`ui.addContextMenuItem` (node)** | **"Smoke Test (node)" in node context menu** |
+| **`ui.addContextMenuItem` (edge)** | **"Smoke Test (edge)" in edge context menu** |
+
+## Visible UI elements
+
+When activated, you will see **visible, clickable components** in these locations:
+
+- **Status Bar**: "Smoke Test" button at bottom  
+- **Navbar**: 🦎 icon in left sidebar
+- **Inspector**: "Smoke Test" tab with active event log display (right panel)
+- **Context Menus**: Red "Smoke Test (target)" items in node/edge right-click menus
+
+All buttons log their activation to the plugin's event log. Click any button to see it appear in the browser console and Inspector tab.
 
 ## Usage
 
@@ -66,11 +77,21 @@ After activation, open the browser console. You should see lines like:
 [smoke-test] events.emit/on ✓
 [smoke-test] settings.get ✓ — keys:[...]
 [smoke-test] settings.subscribe ✓
-[smoke-test] ui.addToolbarItem ✓
-...
+[smoke-test] ui.addStatusBarItem ✓
+[smoke-test] ui.addNavbarItem ✓
+[smoke-test] ui.addInspectorTab ✓ (icon + panel)
+[smoke-test] ui.addContextMenuItem ✓ (node)
+[smoke-test] ui.addContextMenuItem ✓ (edge)
 [smoke-test] register() complete — all API surfaces exercised ✓
 [smoke-test] engine.registerNodeType ✓ (smoke-test:ping)
 ```
+
+### Test the components
+
+1. **Click any visible button/icon** → look for the button-click log entries
+2. **Open the Inspector** → click the "Smoke Test" tab to see the last 5 logged events  
+3. **Right-click canvas/nodes/edges** → see the injected red "Smoke Test (target)" menu items
+4. **Open terminal and run `smoke-test`** → dumps the full event log to console
 
 Run `smoke-test` in the terminal to reprint the full ordered event log at any time.
 

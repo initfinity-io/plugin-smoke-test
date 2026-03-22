@@ -24,6 +24,7 @@ function makeMockAPI() {
     ui: {
       registerSlot:       vi.fn(() => vi.fn()),
       addInspectorTab:    vi.fn(() => vi.fn()),
+      addDebugTab:        vi.fn(() => vi.fn()),
       addToolbarItem:     vi.fn(() => vi.fn()),
       addContextMenuItem: vi.fn(() => vi.fn()),
       addNavbarItem:      vi.fn(() => vi.fn()),
@@ -110,10 +111,15 @@ describe('register()', () => {
     expect(() => register(api as any)).not.toThrow();
   });
 
-  it('registers the smoke-test command', () => {
+  it('registers smoke-test and open-modal commands', () => {
     register(api as any);
     expect(api.commands.register).toHaveBeenCalledWith(
       'smoke-test',
+      expect.any(Function),
+      expect.any(String),
+    );
+    expect(api.commands.register).toHaveBeenCalledWith(
+      'open-modal',
       expect.any(Function),
       expect.any(String),
     );
@@ -164,14 +170,20 @@ describe('register()', () => {
 
   it('registers all UI slots', () => {
     register(api as any);
-    expect(api.ui.addToolbarItem).toHaveBeenCalled();
     expect(api.ui.addStatusBarItem).toHaveBeenCalled();
     expect(api.ui.addNavbarItem).toHaveBeenCalled();
+    expect(api.ui.addToolbarItem).toHaveBeenCalled();
     expect(api.ui.addInspectorTab).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'smoke-test', label: 'Smoke Test' }),
     );
-    // Called for both 'canvas' and 'node'
-    expect(api.ui.addContextMenuItem).toHaveBeenCalledTimes(2);
+    expect(api.ui.addDebugTab).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'smoke-test', label: 'Smoke Test' }),
+    );
+    // Called for 'canvas', 'node', and 'edge' targets
+    expect(api.ui.addContextMenuItem).toHaveBeenCalledTimes(3);
+    expect(api.ui.addContextMenuItem).toHaveBeenCalledWith('canvas', expect.any(Function));
+    expect(api.ui.addContextMenuItem).toHaveBeenCalledWith('node', expect.any(Function));
+    expect(api.ui.addContextMenuItem).toHaveBeenCalledWith('edge', expect.any(Function));
   });
 
   it('populates smokeLog with registration events', () => {

@@ -12,7 +12,7 @@
  *  • engine.subscribe + engine.registerNodeType / removeNodeType
  *  • events.emit / events.on
  *  • settings.get / settings.subscribe
- *  • UI slots: toolbar, status-bar, navbar, inspector-tab, context-menu
+ *  • UI slots: status-bar, navbar, inspector-tab, context-menu (node/edge)
  *
  * Usage
  * ─────
@@ -51,6 +51,7 @@ interface PluginAPI {
   ui: {
     registerSlot(slotName: string, component: unknown, order?: number): () => void;
     addInspectorTab(config: { id: string; icon: unknown; label: string; panel: unknown }): () => void;
+    addDebugTab(config: { id: string; label: string; panel: unknown }): () => void;
     addToolbarItem(component: unknown, order?: number): () => void;
     addContextMenuItem(target: 'node' | 'edge' | 'canvas', component: unknown): () => void;
     addNavbarItem(component: unknown, order?: number): () => void;
@@ -93,6 +94,8 @@ export const manifest: PluginManifest = {
 // ---------------------------------------------------------------------------
 
 export const smokeLog: string[] = [];
+
+const OPEN_MODAL_EVENT = 'plugin-smoke-test:open-modal';
 
 function log(msg: string): void {
   smokeLog.push(msg);
@@ -137,31 +140,324 @@ const SMOKE_NODE_DEF = {
 };
 
 // ---------------------------------------------------------------------------
-// Minimal stub React component (createElement-only, no JSX import needed)
-// Uses globalThis.React if available; stays inert otherwise.
+// Visible React components (createElement-only, no JSX import needed)
+// Each component displays which slot it was injected into.
 // ---------------------------------------------------------------------------
 
-function makeStubComponent(displayName: string) {
-  // Return a plain object that satisfies ComponentType at runtime without
-  // requiring a compile-time React import.
-  const fn: ((props?: Record<string, unknown>) => unknown) & { displayName?: string } = () => {
+/**
+ * Create a button-like component for toolbar/navbar/status-bar slots.
+ * Logs activation events when clicked.
+ */
+function makeButtonComponent(slotName: string, label: string) {
+  const fn: ((props?: Record<string, unknown>) => unknown) & { displayName?: string } = (props?: any) => {
     const React = (globalThis as any).React;
     if (!React) return null;
+
+    const baseStyle: Record<string, unknown> = {
+      cursor: 'pointer',
+      border: '1px solid var(--border-medium)',
+      color: 'var(--text-primary)',
+      backgroundColor: 'var(--bg-secondary)',
+    };
+
+    const slotStyle: Record<string, unknown> =
+      slotName === 'navbar'
+        ? {
+            width: '40px',
+            height: '40px',
+            borderRadius: '10px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '20px',
+            padding: 0,
+          }
+        : {
+            padding: '4px 8px',
+            marginRight: '4px',
+            borderRadius: '6px',
+            fontSize: '12px',
+            fontWeight: '600',
+          };
+
     return React.createElement(
-      'span',
-      { 'data-plugin': 'smoke-test', 'data-slot': displayName, style: { display: 'none' } },
+      'button',
+      {
+        onClick: () => log(`UI:${slotName} button clicked`),
+        style: { ...baseStyle, ...slotStyle },
+        title: `Smoke Test — injected into ${slotName}`,
+        'data-plugin': 'smoke-test',
+        'data-slot': slotName,
+      },
+      label,
     );
   };
-  fn.displayName = displayName;
+  fn.displayName = `Smoke${slotName}`;
   return fn;
 }
 
-const SmokeToolbarItem   = makeStubComponent('SmokeToolbarItem');
-const SmokeStatusBarItem = makeStubComponent('SmokeStatusBarItem');
-const SmokeNavbarItem    = makeStubComponent('SmokeNavbarItem');
-const SmokeInspectorIcon = makeStubComponent('SmokeInspectorIcon');
-const SmokeInspectorPanel = makeStubComponent('SmokeInspectorPanel');
-const SmokeContextItem   = makeStubComponent('SmokeContextItem');
+/**
+ * Navbar button that opens a plugin-owned modal.
+ */
+function makeNavbarModalButton() {
+  const fn: ((props?: Record<string, unknown>) => unknown) & { displayName?: string } = () => {
+    const React = (globalThis as any).React;
+    if (!React) return null;
+
+    const [isOpen, setIsOpen] = React.useState(false);
+
+    React.useEffect(() => {
+      const open = () => setIsOpen(true);
+      window.addEventListener(OPEN_MODAL_EVENT, open);
+      return () => window.removeEventListener(OPEN_MODAL_EVENT, open);
+    }, []);
+
+    const button = React.createElement(
+      'button',
+      {
+        onClick: () => {
+          log('UI:navbar modal opened');
+          setIsOpen(true);
+        },
+        style: {
+          width: '40px',
+          height: '40px',
+          borderRadius: '10px',
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '20px',
+          padding: 0,
+          cursor: 'pointer',
+          border: '1px solid var(--border-medium)',
+          color: 'var(--text-primary)',
+          backgroundColor: 'var(--bg-secondary)',
+        },
+        title: 'Smoke Test Modal',
+        'data-plugin': 'smoke-test',
+        'data-slot': 'navbar',
+      },
+      '🦎',
+    );
+
+    if (!isOpen) return button;
+
+    const close = () => setIsOpen(false);
+
+    const modal = React.createElement(
+      'div',
+      {
+        onClick: close,
+        style: {
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(0,0,0,0.45)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 2000,
+        },
+      },
+      React.createElement(
+        'div',
+        {
+          onClick: (e: Event) => e.stopPropagation(),
+          style: {
+            width: 'min(520px, 92vw)',
+            maxHeight: '80vh',
+            overflow: 'auto',
+            borderRadius: '12px',
+            border: '1px solid var(--border-medium)',
+            backgroundColor: 'var(--bg-secondary)',
+            color: 'var(--text-primary)',
+            boxShadow: 'var(--shadow-lg)',
+            padding: '16px',
+          },
+        },
+        React.createElement(
+          'div',
+          { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' } },
+          React.createElement('strong', null, 'Smoke Test Plugin Modal'),
+          React.createElement(
+            'button',
+            {
+              onClick: close,
+              style: {
+                border: '1px solid var(--border-medium)',
+                backgroundColor: 'var(--bg-primary)',
+                color: 'var(--text-primary)',
+                borderRadius: '8px',
+                width: '30px',
+                height: '30px',
+                cursor: 'pointer',
+              },
+            },
+            '×',
+          ),
+        ),
+        React.createElement(
+          'p',
+          { style: { margin: 0, lineHeight: 1.45 } },
+          'This modal is rendered and controlled entirely by the smoke-test plugin via the navbar slot.',
+        ),
+      ),
+    );
+
+    return React.createElement(React.Fragment, null, button, modal);
+  };
+
+  fn.displayName = 'SmokeNavbarModalButton';
+  return fn;
+}
+
+/**
+ * Create a panel component for the debug panel tab.
+ */
+function makeDebugPanel() {
+  const fn: ((props?: Record<string, unknown>) => unknown) & { displayName?: string } = () => {
+    const React = (globalThis as any).React;
+    if (!React) return null;
+
+    return React.createElement(
+      'div',
+      {
+        style: {
+          padding: '12px',
+          fontSize: '13px',
+          fontFamily: 'monospace',
+          color: 'var(--text-primary)',
+          backgroundColor: 'var(--bg-secondary)',
+          overflowY: 'auto',
+          flex: 1,
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-word',
+        },
+        'data-plugin': 'smoke-test',
+        'data-slot': 'debug-panel-panels',
+      },
+      'Smoke Test — Debug Panel\n\nRecent events:\n' + smokeLog.slice(-10).map((e, i) => `${i + 1}. ${e}`).join('\n'),
+    );
+  };
+  fn.displayName = 'SmokeDebugPanel';
+  return fn;
+}
+
+/**
+ * Create a panel component for inspector tabs.
+ */
+function makeInspectorPanel() {
+  const fn: ((props?: Record<string, unknown>) => unknown) & { displayName?: string } = () => {
+    const React = (globalThis as any).React;
+    if (!React) return null;
+
+    return React.createElement(
+      'div',
+      {
+        style: {
+          padding: '12px',
+          fontSize: '13px',
+          fontFamily: 'monospace',
+          color: 'var(--text-primary)',
+          backgroundColor: 'var(--bg-secondary)',
+          border: '1px solid var(--border-light)',
+          borderRadius: '4px',
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-word',
+        },
+        'data-plugin': 'smoke-test',
+        'data-slot': 'inspector-tab-panels',
+      },
+      'Smoke Test Inspector\n\nEvents logged:\n' + smokeLog.slice(-5).map((e, i) => `${i + 1}. ${e}`).join('\n'),
+    );
+  };
+  fn.displayName = 'SmokeInspectorPanel';
+  return fn;
+}
+
+/**
+ * Create an icon component for inspector tab buttons.
+ * Must accept size prop for consistent icon sizing.
+ */
+function makeInspectorIcon() {
+  const fn: ((props?: Record<string, unknown>) => unknown) & { displayName?: string } = (props?: any) => {
+    const React = (globalThis as any).React;
+    if (!React) return null;
+    const size = props?.size ?? 18;
+
+    return React.createElement(
+      'span',
+      {
+        style: {
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: `${size}px`,
+          height: `${size}px`,
+          backgroundColor: 'var(--accent)',
+          borderRadius: '50%',
+          color: 'var(--bg-primary)',
+          fontSize: `${Math.round(size * 0.6)}px`,
+          fontWeight: 'bold',
+        },
+        title: 'Smoke Test Inspector Tab',
+        'data-plugin': 'smoke-test',
+        'data-slot': 'inspector-tab-buttons',
+      },
+      'S',
+    );
+  };
+  fn.displayName = 'SmokeInspectorIcon';
+  return fn;
+}
+
+/**
+ * Create a context menu item (canvas, node, edge).
+ */
+function makeContextMenuItem(target: string) {
+  const fn: ((props?: Record<string, unknown>) => unknown) & { displayName?: string } = (props?: any) => {
+    const React = (globalThis as any).React;
+    if (!React) return null;
+
+    const onClose = (props?.onClose as AnyFn) ?? (() => { });
+
+    return React.createElement(
+      'button',
+      {
+        onClick: () => {
+          log(`UI:context-menu-${target} item clicked`);
+          onClose();
+        },
+        style: {
+          display: 'block',
+          width: '100%',
+          padding: '8px 12px',
+          textAlign: 'left',
+          backgroundColor: 'transparent',
+          border: 'none',
+          cursor: 'pointer',
+          fontSize: '13px',
+          color: 'var(--text-primary)',
+          fontWeight: '600',
+        },
+        'data-plugin': 'smoke-test',
+        'data-slot': `context-menu-${target}`,
+      },
+      `Smoke Test (${target})`,
+    );
+  };
+  fn.displayName = `SmokeContextMenu${target}`;
+  return fn;
+}
+
+const SmokeStatusBarItem    = makeButtonComponent('status-bar', 'Smoke Test');
+const SmokeNavbarItem       = makeNavbarModalButton();
+const SmokeToolbarItem      = makeButtonComponent('toolbar', '🔥 Smoke');
+const SmokeInspectorIcon    = makeInspectorIcon();
+const SmokeInspectorPanel   = makeInspectorPanel();
+const SmokeDebugPanel       = makeDebugPanel();
+const SmokeContextMenuNode  = makeContextMenuItem('node');
+const SmokeContextMenuEdge  = makeContextMenuItem('edge');
+const SmokeContextMenuCanvas = makeContextMenuItem('canvas');
 
 // ---------------------------------------------------------------------------
 // Internal reference kept for dispose()
@@ -187,6 +483,15 @@ export function register(api: PluginAPI): void {
       console.groupEnd();
     },
     'Print the smoke-test plugin event log',
+  );
+
+  api.commands.register(
+    'open-modal',
+    () => {
+      log('open-modal command invoked');
+      window.dispatchEvent(new CustomEvent(OPEN_MODAL_EVENT));
+    },
+    'Open the smoke-test plugin modal from PUCC',
   );
   log('commands.register ✓');
 
@@ -282,27 +587,53 @@ export function register(api: PluginAPI): void {
   log('settings.subscribe ✓');
 
   // ── 6. UI slots ───────────────────────────────────────────────────────────
+  // NOTE: Available slots that are actually rendered in the UI:
+  //   - status-bar (bottom status bar)
+  //   - toolbar (toolbar panel)
+  //   - navbar (left sidebar)
+  //   - inspector-tab-buttons + inspector-tab-panels (right-panel inspector tabs)
+  //   - context-menu-canvas (canvas context menu)
+  //   - context-menu-node (node context menu)
+  //   - context-menu-edge (edge context menu)
 
-  api.ui.addToolbarItem(SmokeToolbarItem, 999);
-  log('ui.addToolbarItem ✓');
-
+  // Status bar item — bottom status bar
   api.ui.addStatusBarItem(SmokeStatusBarItem, 999);
   log('ui.addStatusBarItem ✓');
 
+  // Navbar item — left sidebar navigation
   api.ui.addNavbarItem(SmokeNavbarItem, 999);
   log('ui.addNavbarItem ✓');
 
+  // Toolbar item — canvas toolbar
+  api.ui.addToolbarItem(SmokeToolbarItem, 999);
+  log('ui.addToolbarItem ✓');
+
+  // Inspector tab — right-panel inspector with icon + panel
   api.ui.addInspectorTab({
     id: 'smoke-test',
     icon: SmokeInspectorIcon,
     label: 'Smoke Test',
     panel: SmokeInspectorPanel,
   });
-  log('ui.addInspectorTab ✓');
+  log('ui.addInspectorTab ✓ (icon + panel)');
 
-  api.ui.addContextMenuItem('canvas', SmokeContextItem);
-  api.ui.addContextMenuItem('node',   SmokeContextItem);
-  log('ui.addContextMenuItem ✓ (canvas + node)');
+  // Debug panel tab — adds a 'Smoke Test' tab to the bottom debug panel
+  api.ui.addDebugTab({
+    id: 'smoke-test',
+    label: 'Smoke Test',
+    panel: SmokeDebugPanel,
+  });
+  log('ui.addDebugTab ✓');
+
+  // Context menu items — for canvas, node and edge targets
+  api.ui.addContextMenuItem('canvas', SmokeContextMenuCanvas);
+  log('ui.addContextMenuItem ✓ (canvas)');
+
+  api.ui.addContextMenuItem('node', SmokeContextMenuNode);
+  log('ui.addContextMenuItem ✓ (node)');
+
+  api.ui.addContextMenuItem('edge', SmokeContextMenuEdge);
+  log('ui.addContextMenuItem ✓ (edge)');
 
   log('register() complete — all API surfaces exercised ✓');
 }
