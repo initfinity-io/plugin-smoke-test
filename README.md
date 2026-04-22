@@ -108,16 +108,6 @@ pnpm test
 pnpm build
 ```
 
-## Scaffolding new plugins
-
-This package was created with the `plugin` Turbo generator:
-
-```bash
-pnpm turbo gen plugin
-```
-
-See `turbo/generators/config.ts` for the generator definition and `turbo/generators/templates/plugin-*.hbs` for the templates.
-
 ## License
 
 MIT

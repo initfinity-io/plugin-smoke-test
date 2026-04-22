@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "description": "End-to-end smoke test that exercises the full Initfinity plugin API",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:initfinity-io/plugin-smoke-test.git"
+  },
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -11,7 +15,9 @@
     "dev": "tsc --project tsconfig.json --watch",
     "check-types": "tsc --noEmit",
     "test": "vitest run",
-    "lint": "eslint src/"
+    "lint": "eslint src/",
+    "publish:gh": "cd $(git -C . rev-parse --show-toplevel) && git subtree push --prefix=plugins/plugin-smoke-test git@github.com:initfinity-io/plugin-smoke-test.git main",
+    "publish:npm": "npm publish"
   },
   "devDependencies": {
     "vitest": "^2.0.0"
